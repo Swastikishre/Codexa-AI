@@ -2,12 +2,26 @@ import { GoogleGenAI } from '@google/genai';
 import { ProjectFile } from '../types';
 
 let ai: GoogleGenAI | null = null;
+
+export function setApiKey(key: string) {
+  if (key) {
+    localStorage.setItem('USER_GEMINI_API_KEY', key);
+  } else {
+    localStorage.removeItem('USER_GEMINI_API_KEY');
+  }
+  ai = null; // force re-init
+}
+
+export function hasApiKey(): boolean {
+  return !!(localStorage.getItem('USER_GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY);
+}
+
 function getAi() {
   if (!ai) {
     // Safely access API key. For Vite client code, VITE_ prefixed env vars are available.
     // We also check process.env for Node setup.
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not defined");
+    const apiKey = localStorage.getItem('USER_GEMINI_API_KEY') || import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY_MISSING");
     ai = new GoogleGenAI({ apiKey });
   }
   return ai;
@@ -54,6 +68,10 @@ export async function sendMessage(
     return response.text || 'No response generated.';
   } catch (error: any) {
     console.error("Gemini API Error:", error);
+    if (error.message === "GEMINI_API_KEY_MISSING") {
+      throw error;
+    }
     throw new Error(error.message || "An error occurred during AI generation.");
   }
 }
+
