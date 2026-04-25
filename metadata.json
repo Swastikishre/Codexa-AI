@@ -1,6 +1,6 @@
 {
-  "name": "Cloud IDE & AI Assistant",
-  "description": "Robust web-based IDE with Monaco Editor and an AI coding assistant powered by Gemini 3.1 Pro.",
+  "name": "Codexa AI",
+  "description": "Robust web-based IDE with Monaco Editor and an AI coding assistant powered by Gemini 3.1 Pro supporting 30+ languages.",
   "requestFramePermissions": [
     "microphone"
   ],

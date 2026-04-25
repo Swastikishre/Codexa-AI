@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, ImagePlus, X, Loader2 } from 'lucide-react';
+import { Send, Mic, MicOff, ImagePlus, X, Loader2, Code2 } from 'lucide-react';
 import { ChatMessage, ProjectFile } from '../types';
 import { startDictation } from '../lib/speech';
 import { sendMessage } from '../lib/gemini';
@@ -7,9 +7,10 @@ import Markdown from 'react-markdown';
 
 interface ChatPaneProps {
   files: ProjectFile[];
+  onApplyCode?: (code: string) => void;
 }
 
-export function ChatPane({ files }: ChatPaneProps) {
+export function ChatPane({ files, onApplyCode }: ChatPaneProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -120,7 +121,7 @@ export function ChatPane({ files }: ChatPaneProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900 border-l border-neutral-800 w-[400px] shrink-0">
+    <div className="flex flex-col h-full bg-neutral-900 md:border-l border-neutral-800 w-full shrink-0">
       <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-950 shrink-0">
         <h2 className="font-semibold text-neutral-100 text-sm">AI Assistant</h2>
         <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer hover:text-neutral-200">
@@ -137,13 +138,13 @@ export function ChatPane({ files }: ChatPaneProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
         {messages.length === 0 && (
           <div className="text-center text-neutral-500 mt-10">
-            <p className="text-sm">Hi! I'm your GenAI coding assistant.</p>
-            <p className="text-xs mt-2">I use Google Search grounding and can read your editor files.</p>
+            <p className="text-sm">Hi! I'm Codexa AI, your coding assistant.</p>
+            <p className="text-xs mt-2">I support over 30 languages! I use Google Search grounding and can read your editor files.</p>
           </div>
         )}
         {messages.map(msg => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`max-w-[85%] rounded-lg px-4 py-3 ${
+            <div className={`max-w-[100%] md:max-w-[90%] rounded-lg px-4 py-3 ${
               msg.role === 'user' ? 'bg-neutral-800 text-neutral-100' 
               : msg.isError ? 'bg-red-900/20 text-red-200 border border-red-800/50' 
               : 'bg-transparent text-neutral-200'
@@ -155,8 +156,42 @@ export function ChatPane({ files }: ChatPaneProps) {
                   ))}
                 </div>
               )}
-              <div className="text-sm markdown-body leading-relaxed max-w-none break-words">
-                <Markdown>{msg.text}</Markdown>
+              <div className="text-sm markdown-body leading-relaxed max-w-none break-words w-full">
+                <Markdown
+                  components={{
+                    pre: ({children}) => <>{children}</>,
+                    code(props) {
+                      const {children, className, node, ...rest} = props;
+                      const match = /language-(\w+)/.exec(className || '');
+                      const isInline = !match && !String(children).includes('\n');
+                      
+                      if (!isInline) {
+                        const codeString = String(children).replace(/\n$/, '');
+                        return (
+                          <div className="relative group my-4">
+                            <div className="absolute right-2 top-2 z-10">
+                              <button 
+                                onClick={() => onApplyCode && onApplyCode(codeString)} 
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-md text-[11px] font-medium shadow-sm flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                                title="Apply to current active file"
+                              >
+                                <Code2 size={12} /> Apply Code
+                              </button>
+                            </div>
+                            <pre className="bg-neutral-900 border border-neutral-700 p-4 rounded-lg overflow-x-auto font-mono text-[13px] text-neutral-300 w-full mb-0 mt-0">
+                              <code className={className} {...rest}>
+                                {children}
+                              </code>
+                            </pre>
+                          </div>
+                        );
+                      }
+                      return <code className={`${className} bg-neutral-800 px-1 py-0.5 rounded font-mono text-[13px] text-blue-300`} {...rest}>{children}</code>;
+                    }
+                  }}
+                >
+                  {msg.text}
+                </Markdown>
               </div>
             </div>
           </div>
@@ -239,3 +274,4 @@ export function ChatPane({ files }: ChatPaneProps) {
     </div>
   );
 }
+
