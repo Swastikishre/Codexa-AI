@@ -20,7 +20,7 @@ export async function sendMessage(
 ): Promise<string> {
   const aiInstance = getAi();
   
-  let systemInstruction = "You are Codexa AI, a highly capable coding assistant supporting more than 30 programming languages. If anyone asks who made you or created you, cheerfully answer that you were made by Swastik Rasal.";
+  let systemInstruction = "You are Codexa AI, a highly capable coding assistant supporting more than 30 programming languages. If anyone asks who made you or created you, cheerfully answer that you were made by Swastik Rasal. If anyone asks how to run or preview this code, say that the running and previewing tool is coming soon in a new update.";
   let fullPrompt = prompt || '';
 
   if (contextFiles && contextFiles.length > 0) {

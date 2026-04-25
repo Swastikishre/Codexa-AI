@@ -21,6 +21,9 @@ export default function App() {
   const [theme, setTheme] = useState('vs-dark');
   const [mobileView, setMobileView] = useState<'editor' | 'chat'>('editor');
 
+  const [showAddFileModal, setShowAddFileModal] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+
   const activeFile = files.find(f => f.id === activeFileId);
 
   const handleFileChange = (id: string, content: string | undefined) => {
@@ -31,8 +34,9 @@ export default function App() {
     setFiles(files.map(f => f.id === id ? { ...f, language } : f));
   };
 
-  const handleAddFile = () => {
-    const name = prompt("Enter file name (e.g., script.js, index.html):");
+  const submitNewFile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newFileName;
     if (!name?.trim()) return;
     
     const ext = name.split('.').pop()?.toLowerCase();
@@ -47,6 +51,12 @@ export default function App() {
     setFiles([...files, { id: newId, name, language, content: '' }]);
     setActiveFileId(newId);
     setMobileView('editor'); // Switch to editor view if on mobile
+    setShowAddFileModal(false);
+    setNewFileName('');
+  };
+
+  const handleAddFile = () => {
+    setShowAddFileModal(true);
   };
 
   const handleApplyCode = (code: string) => {
@@ -151,6 +161,39 @@ export default function App() {
           <ChatPane files={files} onApplyCode={handleApplyCode} />
         </div>
       </main>
+
+      {/* Add File Modal */}
+      {showAddFileModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <form onSubmit={submitNewFile} className="bg-neutral-900 border border-neutral-700 rounded-lg p-5 w-full max-w-sm shadow-xl flex flex-col gap-4">
+            <h2 className="text-sm font-semibold text-neutral-100">Create New File</h2>
+            <input 
+              autoFocus
+              type="text" 
+              placeholder="e.g., index.html, script.js"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              className="bg-neutral-950 border border-neutral-800 text-neutral-100 px-3 py-2 text-sm rounded-md focus:outline-none focus:border-blue-500"
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button 
+                type="button" 
+                onClick={() => setShowAddFileModal(false)}
+                className="px-4 py-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={!newFileName.trim()}
+                className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

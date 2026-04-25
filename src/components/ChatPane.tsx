@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, ImagePlus, X, Loader2, Code2 } from 'lucide-react';
-import { ChatMessage, ProjectFile } from '../types';
+import { Send, Mic, MicOff, ImagePlus, X, Loader2, Code2, Plus, MessageSquare, ChevronDown } from 'lucide-react';
+import { ChatMessage, ProjectFile, ChatSession } from '../types';
 import { startDictation } from '../lib/speech';
 import { sendMessage } from '../lib/gemini';
 import Markdown from 'react-markdown';
@@ -11,7 +11,12 @@ interface ChatPaneProps {
 }
 
 export function ChatPane({ files, onApplyCode }: ChatPaneProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([{
+    id: '1', title: 'New Chat', messages: [], updatedAt: Date.now()
+  }]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('1');
+  const [showHistory, setShowHistory] = useState(false);
+  
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
@@ -24,7 +29,17 @@ export function ChatPane({ files, onApplyCode }: ChatPaneProps) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [sessions, activeSessionId, isLoading]);
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
+  const messages = activeSession.messages;
+
+  const createNewChat = () => {
+    const newId = Date.now().toString();
+    setSessions(prev => [{ id: newId, title: 'New Chat', messages: [], updatedAt: Date.now() }, ...prev]);
+    setActiveSessionId(newId);
+    setShowHistory(false);
+  };
 
   const toggleRecording = () => {
     if (isRecording && recognition) {
@@ -84,30 +99,63 @@ export function ChatPane({ files, onApplyCode }: ChatPaneProps) {
       images: selectedImages.length > 0 ? selectedImages : undefined
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+      ...s,
+      messages: [...s.messages, newMessage],
+      updatedAt: Date.now()
+    } : s));
+    
     setInput('');
     setSelectedImages([]);
     setIsLoading(true);
 
     try {
+      // Build full prompt history
+      const currentMessages = activeSession.messages;
+      const fullHistoryStr = currentMessages.length > 0 
+        ? '[Previous Chat History]\n' + currentMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n\n') + '\n\n[New Message]\n'
+        : '';
+        
+      const promptToUse = fullHistoryStr + newMessage.text;
+
       const aiResponse = await sendMessage(
-        newMessage.text,
+        promptToUse,
         newMessage.images || [],
         includeContext ? files : null
       );
       
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: aiResponse
-      }]);
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          const isFirstInteraction = s.title === 'New Chat';
+          let newTitle = s.title;
+          if (isFirstInteraction) {
+            const cleaned = aiResponse.replace(/[^a-zA-Z0-9 ]/g, '').trim().split(' ').filter(Boolean);
+            newTitle = cleaned.slice(0, 4).join(' ') + (cleaned.length > 4 ? '...' : '');
+            if (!newTitle) newTitle = "Chat";
+          }
+          return {
+            ...s,
+            title: newTitle,
+            messages: [...s.messages, {
+              id: (Date.now() + 1).toString(),
+              role: 'model',
+              text: aiResponse
+            }],
+            updatedAt: Date.now()
+          };
+        }
+        return s;
+      }));
     } catch (err: any) {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: err.message,
-        isError: true
-      }]);
+      setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+        ...s,
+        messages: [...s.messages, {
+          id: (Date.now() + 1).toString(),
+          role: 'model',
+          text: err.message,
+          isError: true
+        }]
+      } : s));
     } finally {
       setIsLoading(false);
     }
@@ -121,18 +169,58 @@ export function ChatPane({ files, onApplyCode }: ChatPaneProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900 md:border-l border-neutral-800 w-full shrink-0">
+    <div className="flex flex-col h-full bg-neutral-900 md:border-l border-neutral-800 w-full shrink-0 relative">
       <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-950 shrink-0">
-        <h2 className="font-semibold text-neutral-100 text-sm">AI Assistant</h2>
-        <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer hover:text-neutral-200">
-          <input 
-            type="checkbox" 
-            checked={includeContext} 
-            onChange={(e) => setIncludeContext(e.target.checked)}
-            className="rounded border-neutral-700 bg-neutral-800 text-blue-500 focus:ring-blue-500"
-          />
-          Read Editor Tabs
-        </label>
+        <div className="relative">
+          <button 
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-1.5 font-semibold text-neutral-100 text-sm hover:text-neutral-300 transition-colors"
+          >
+            {activeSession.title}
+            <ChevronDown size={14} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showHistory && (
+            <div className="absolute top-full left-0 mt-2 w-64 bg-neutral-900 border border-neutral-800 rounded-lg shadow-xl z-30 flex flex-col py-2 max-h-96 overflow-y-auto">
+              <button 
+                onClick={createNewChat}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800 mx-2 rounded-md mb-2 border border-neutral-700 hover:border-neutral-600 transition-all font-medium"
+              >
+                <Plus size={16} /> New Chat
+              </button>
+              <div className="px-3 pb-1 pt-2 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">Recent</div>
+              {sessions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => { setActiveSessionId(s.id); setShowHistory(false); }}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm text-left truncate transition-colors ${activeSessionId === s.id ? 'bg-blue-500/10 text-blue-400' : 'text-neutral-300 hover:bg-neutral-800'}`}
+                >
+                  <MessageSquare size={14} className="shrink-0" />
+                  <span className="truncate">{s.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={createNewChat}
+            className="text-neutral-400 hover:text-neutral-100 transition-colors p-1"
+            title="New Chat"
+          >
+            <Plus size={18} />
+          </button>
+          <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer hover:text-neutral-200">
+            <input 
+              type="checkbox" 
+              checked={includeContext} 
+              onChange={(e) => setIncludeContext(e.target.checked)}
+              className="rounded border-neutral-700 bg-neutral-800 text-blue-500 focus:ring-blue-500"
+            />
+            Read Tabs
+          </label>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">

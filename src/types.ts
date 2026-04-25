@@ -12,3 +12,10 @@ export interface ChatMessage {
   images?: { mimeType: string; data: string; dataUrl: string }[];
   isError?: boolean;
 }
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: number;
+}
